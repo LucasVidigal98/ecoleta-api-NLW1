@@ -1,6 +1,8 @@
 import { Request, Response } from 'express';
 import knex from '../database/connection';
 
+import cfg from '../../config';
+
 class PointsController {
     async show(request: Request, response: Response) {
         const { id } = request.params;
@@ -16,7 +18,12 @@ class PointsController {
             .where('point-itens.point_id', id)
             .select('itens.title');
 
-        return response.json({ point, itens });
+        const serializedPoint = {
+            ...point,
+            image_url: `http://${cfg.ip}/uploads/${point.image}`
+        };
+
+        return response.json({ point: serializedPoint, itens });
     };
 
     async create(request: Request, response: Response) {
@@ -35,7 +42,7 @@ class PointsController {
         const trx = await knex.transaction();
 
         const point = {
-            image: 'https://images.unsplash.com/photo-1542838132-92c53300491e?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=400&q=60',
+            image: request.file.filename,
             name,
             email,
             whatsapp,
@@ -49,12 +56,15 @@ class PointsController {
 
         const point_id = insertedIds[0];
 
-        const pointItens = itens.map((item_id: Number) => {
-            return {
-                item_id,
-                point_id
-            };
-        });
+        const pointItens = itens
+            .split(',')
+            .map((item: string) => Number(item.trim()))
+            .map((item_id: Number) => {
+                return {
+                    item_id,
+                    point_id
+                };
+            });
 
         await trx('point-itens').insert(pointItens);
 
@@ -79,7 +89,14 @@ class PointsController {
             .distinct()
             .select('points.*');
 
-        return response.json(points);
+        const serializedPoints = points.map(point => {
+            return {
+                ...point,
+                image_url: `http://${cfg.ip}/uploads/${point.image}`
+            }
+        });
+
+        return response.json(serializedPoints);
     };
 }
 
